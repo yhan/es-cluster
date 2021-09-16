@@ -1,0 +1,191 @@
+# version: '2.2'
+# services:
+#   es01:
+#     image: docker.elastic.co/elasticsearch/elasticsearch:7.3.1
+#     container_name: es01
+#     environment:
+#       - node.name=es01
+#       - discovery.seed_hosts=es02
+#       - cluster.initial_master_nodes=es01,es02
+#       - cluster.name=docker-cluster
+#       - bootstrap.memory_lock=true
+#       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+#     ulimits:
+#       memlock:
+#         soft: -1
+#         hard: -1
+#     volumes:
+#       - esdata01:/usr/share/elasticsearch/data
+#     ports:
+#       - 9200:9200
+#     networks:
+#       - esnet
+#   es02:
+#     image: docker.elastic.co/elasticsearch/elasticsearch:7.3.1
+#     container_name: es02
+#     environment:
+#       - node.name=es02
+#       - discovery.seed_hosts=es01
+#       - cluster.initial_master_nodes=es01,es02
+#       - cluster.name=docker-cluster
+#       - bootstrap.memory_lock=true
+#       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+#     ulimits:
+#       memlock:
+#         soft: -1
+#         hard: -1
+#     volumes:
+#       - esdata02:/usr/share/elasticsearch/data
+#     networks:
+#       - esnet
+#   # kibana:
+#   #   image: docker.elastic.co/kibana/kibana:7.3.1
+#   #   container_name: kibana
+#   #   environment:
+#   #     SERVER_NAME: kibana.local
+#   #     ELASTICSEARCH_HOSTS: http://es01:9200
+#   #   ports:
+#   #     - 5601:5601
+#   #   networks:
+#   #     - esnet
+
+# volumes:
+#   esdata01:
+#     driver: local
+#   esdata02:
+#     driver: local
+
+# networks:
+#   esnet:
+
+# This: es ok, but can not connnect kibana to it
+# with command:
+# docker run --name kib01-test --net elastic -p 5601:5601 -e "ELASTICSEARCH_HOSTS=http://es01:9200" docker.elastic.co/kibana/kibana:7.14.1
+# {"type":"log","@timestamp":"2021-09-16T10:29:57+00:00","tags":["info","savedobjects-service"],"pid":1214,"message":"Waiting until all Elasticsearch nodes are compatible with Kibana before starting saved objects migrations..."}
+# {"type":"log","@timestamp":"2021-09-16T10:30:38+00:00","tags":["error","savedobjects-service"],"pid":1214,"message":"Unable to retrieve version information from Elasticsearch nodes. getaddrinfo ENOTFOUND es01"}
+
+# This works:
+# docker run --name kib01-test --net es-cluster_esnet -p 5601:5601 -e "ELASTICSEARCH_HOSTS=http://es01:9200" docker.elastic.co/kibana/kibana:7.14.1
+
+# This works: es cluster with 3 nodes + kibana
+version: '2.2'
+services:
+  es01:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.14.1
+    container_name: es01
+    environment:
+      - node.name=es01
+      - cluster.name=es-docker-cluster
+      - discovery.seed_hosts=es02,es03
+      - cluster.initial_master_nodes=es01,es02,es03
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      # - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - data01:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+    networks:
+      - elastic
+  es02:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.14.1
+    container_name: es02
+    environment:
+      - node.name=es02
+      - cluster.name=es-docker-cluster
+      - discovery.seed_hosts=es01,es03
+      - cluster.initial_master_nodes=es01,es02,es03
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      # - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - data02:/usr/share/elasticsearch/data
+    networks:
+      - elastic
+  es03:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.14.1
+    container_name: es03
+    environment:
+      - node.name=es03
+      - cluster.name=es-docker-cluster
+      - discovery.seed_hosts=es01,es02
+      - cluster.initial_master_nodes=es01,es02,es03
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      # - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - data03:/usr/share/elasticsearch/data
+    networks:
+      - elastic
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.14.1
+    container_name: kibana
+    environment:
+      SERVER_NAME: kibana.local
+      ELASTICSEARCH_HOSTS: '["http://es01:9200","http://es02:9200","http://es03:9200"]' #both http://es0101 and http://es02:9200 work
+    ports:
+      - 5601:5601
+    networks:
+      - elastic
+
+volumes:
+  data01:
+    driver: local
+  data02:
+    driver: local
+  data03:
+    driver: local
+
+networks:
+  elastic:
+    driver: bridge
+
+## This works
+## version: '3.1'
+# services:
+
+#   elasticsearch:
+#    container_name: elasticsearch
+#    image: docker.elastic.co/elasticsearch/elasticsearch:7.9.2
+#    ports:
+#     - 9200:9200
+#    volumes:
+#     - elasticsearch-data:/usr/share/elasticsearch/data
+#    environment:
+#     - xpack.monitoring.enabled=true
+#     - xpack.watcher.enabled=false
+#     - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+#     - discovery.type=single-node
+#    networks:
+#     - elastic
+
+#   kibana:
+#    container_name: kibana
+#    image: docker.elastic.co/kibana/kibana:7.9.2
+#    ports:
+#     - 5601:5601
+#    depends_on:
+#     - elasticsearch
+#    environment:
+#     - ELASTICSEARCH_URL=http://localhost:9200
+#    networks:
+#     - elastic
+  
+# networks:
+#   elastic:
+#     driver: bridge
+
+# volumes:
+#   elasticsearch-data:
